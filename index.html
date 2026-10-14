@@ -1,0 +1,518 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1f5f8b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="AMSチェック">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
+<title>高度順化チェック</title>
+<style>
+/* Layout: one narrow column like a field notebook; entry form on top, trend chart and log below */
+:root {
+  --bg: #eef2f4;
+  --paper: #ffffff;
+  --ink: #18242c;
+  --muted: #5b6b75;
+  --line: #d3dce1;
+  --accent: #1f5f8b;
+  --accent-soft: #dceaf3;
+  --ok: #2e7d4f;  --ok-soft: #dff1e6;
+  --warn: #a8670a; --warn-soft: #fbecd3;
+  --bad: #b3261e;  --bad-soft: #f8dcd9;
+  --font-body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  --font-num: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #111a20; --paper: #18232b; --ink: #e5edf1; --muted: #93a5b0; --line: #2c3b45;
+  --accent: #7db8df; --accent-soft: #1f3646;
+  --ok: #6cc893; --ok-soft: #1b3326; --warn: #e9b05a; --warn-soft: #3a2c14; --bad: #f08a80; --bad-soft: #3d1d1b;
+  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #111a20; --paper: #18232b; --ink: #e5edf1; --muted: #93a5b0; --line: #2c3b45;
+  --accent: #7db8df; --accent-soft: #1f3646;
+  --ok: #6cc893; --ok-soft: #1b3326; --warn: #e9b05a; --warn-soft: #3a2c14; --bad: #f08a80; --bad-soft: #3d1d1b;
+  color-scheme: dark }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.6; }
+.wrap { max-width: 720px; margin: 0 auto; padding-block: 20px 56px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 20px; }
+h1, h2 { margin: 0; text-wrap: balance; }
+h1 { font-weight: 900; font-size: 1.6rem; letter-spacing: .02em; }
+h2 { font-size: 1.05rem; font-weight: 700; }
+.num { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+.small { font-size: .82rem; }
+
+header { display: flex; flex-direction: column; gap: 10px; }
+.head-row { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px; }
+.eyebrow { font-size: .75rem; letter-spacing: .12em; color: var(--accent); font-weight: 700; }
+.name-field { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.name-field input { width: 11em; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px; font-size: .82rem; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px; font-weight: 700; white-space: nowrap; }
+.pill.ok { background: var(--ok-soft); color: var(--ok); }
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.bad { background: var(--bad-soft); color: var(--bad); }
+
+.card { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+label.f { display: flex; flex-direction: column; gap: 4px; font-size: .82rem; color: var(--muted); font-weight: 500; min-width: 0; }
+input[type=text], input[type=number], input[type=date] {
+  font: inherit; font-size: 1rem; color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 8px; padding: 8px 10px; width: 100%; min-width: 0; }
+input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.unit { position: relative; }
+.unit input { padding-right: 2.6em; }
+.unit span { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: .85rem; pointer-events: none; }
+.grid-meta { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.grid-meta .wide { grid-column: span 2; }
+@media (max-width: 560px) { .grid-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.seg { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { flex: 1; font: inherit; font-size: .95rem; padding: 8px 0; background: var(--bg); color: var(--ink); border: 0; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--paper); font-weight: 700; }
+
+.item { display: flex; flex-direction: column; gap: 8px; padding-top: 14px; border-top: 1px solid var(--line); }
+.item-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.item-head b { font-size: 1rem; }
+.opts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+@media (max-width: 520px) { .opts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.opt { font: inherit; text-align: left; display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; min-height: 64px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); cursor: pointer; }
+.opt .pt { font-family: var(--font-num); font-weight: 600; font-size: 1.15rem; line-height: 1; }
+.opt .lb { font-size: .84rem; line-height: 1.35; }
+.opt[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.opt[aria-pressed="true"] .pt { color: var(--accent); }
+
+.result { display: flex; align-items: center; gap: 16px; padding: 14px 16px; border-radius: var(--r); border: 1px solid transparent; }
+.result.ok { background: var(--ok-soft); color: var(--ok); }
+.result.warn { background: var(--warn-soft); color: var(--warn); }
+.result.bad { background: var(--bad-soft); color: var(--bad); }
+.result.none { background: var(--bg); color: var(--muted); border-color: var(--line); }
+.score-big { font-family: var(--font-num); font-weight: 600; font-size: 2.6rem; line-height: 1; min-width: 2ch; text-align: right; }
+.result .verdict { font-weight: 900; font-size: 1.1rem; }
+.result .advice { font-size: .85rem; color: var(--ink); }
+
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn { font: inherit; font-weight: 700; padding: 10px 18px; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent); color: var(--paper); cursor: pointer; }
+.btn.ghost { background: transparent; color: var(--accent); }
+.btn.danger { background: var(--bad); border-color: var(--bad); }
+.btn.sm { padding: 5px 12px; font-size: .85rem; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.toast { font-size: .85rem; color: var(--ok); font-weight: 700; }
+.err { font-size: .85rem; color: var(--bad); }
+
+.notes { margin: 0; padding-left: 1.2em; font-size: .82rem; color: var(--muted); display: flex; flex-direction: column; gap: 2px; }
+
+.chart-box { overflow-x: auto; }
+.chart-box svg { display: block; }
+.chart-box text { fill: var(--muted); font-family: var(--font-num); font-size: 11px; }
+
+.log { display: flex; flex-direction: column; gap: 8px; }
+.rec { display: grid; grid-template-columns: 3.4rem minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 12px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--bg); border-left-width: 4px; }
+.rec.ok { border-left-color: var(--ok); } .rec.warn { border-left-color: var(--warn); } .rec.bad { border-left-color: var(--bad); }
+.rec .sc { font-family: var(--font-num); font-weight: 600; font-size: 1.6rem; text-align: center; line-height: 1; }
+.rec.ok .sc { color: var(--ok); } .rec.warn .sc { color: var(--warn); } .rec.bad .sc { color: var(--bad); }
+.rec .sc small { display: block; font-size: .65rem; font-family: var(--font-body); color: var(--muted); margin-top: 3px; }
+.rec .meta { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.rec .meta .top { font-weight: 700; overflow-wrap: anywhere; }
+.rec .meta .sub { font-size: .8rem; color: var(--muted); }
+.rec .btns { display: flex; gap: 6px; flex-wrap: wrap; justify-content: end; }
+.example-tag { font-size: .7rem; font-weight: 700; letter-spacing: .08em; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 0 5px; margin-left: 6px; }
+.banner { font-size: .85rem; padding: 10px 12px; border-radius: 8px; background: var(--accent-soft); color: var(--ink); }
+.storage { font-size: .78rem; color: var(--muted); }
+textarea { font-family: var(--font-num); font-size: .78rem; width: 100%; min-height: 6em; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+footer { font-size: .78rem; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
+@media (prefers-reduced-motion: no-preference) { .result, .opt, .seg button { transition: background-color .15s, color .15s; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="head-row">
+      <div>
+        <div class="eyebrow">AMS SELF-CHECK · 2500m〜</div>
+        <h1>高度順化チェック</h1>
+      </div>
+      <label class="name-field small muted" for="name">氏名
+        <input type="text" id="name" placeholder="名前" autocomplete="name">
+      </label>
+    </div>
+    <div class="legend">
+      <span class="pill ok">0〜4P 順調</span>
+      <span class="pill warn">5〜6P 停滞</span>
+      <span class="pill bad">7P以上 下山検討</span>
+    </div>
+  </header>
+
+  <section class="card" aria-labelledby="form-h">
+    <div class="item-head">
+      <h2 id="form-h">記録する</h2>
+      <span id="edit-flag" class="small muted" hidden>編集中の記録</span>
+    </div>
+    <div class="grid-meta">
+      <label class="f" for="date">日付
+        <input type="date" id="date">
+      </label>
+      <div class="f" style="display:flex;flex-direction:column;gap:4px;font-size:.82rem;color:var(--muted)">測定タイミング
+        <div class="seg" role="group" aria-label="測定タイミング">
+          <button type="button" id="t-am" data-time="朝">朝</button>
+          <button type="button" id="t-pm" data-time="夕">夕</button>
+        </div>
+      </div>
+      <label class="f" for="alt">標高
+        <span class="unit"><input type="number" id="alt" inputmode="numeric" min="0" max="9000" step="10" placeholder="3440"><span>m</span></span>
+      </label>
+      <label class="f" for="spo2">SpO2
+        <span class="unit"><input type="number" id="spo2" inputmode="numeric" min="50" max="100" step="1" placeholder="88"><span>%</span></span>
+      </label>
+      <label class="f wide" for="place">場所（宿泊する村）
+        <input type="text" id="place" placeholder="例: ナムチェ・バザール">
+      </label>
+    </div>
+
+    <div id="items"></div>
+
+    <div id="result" class="result none" aria-live="polite">
+      <div class="score-big" id="score">–</div>
+      <div>
+        <div class="verdict" id="verdict">4項目を選んでください</div>
+        <div class="advice" id="advice">頭痛・食欲/吐き気・めまい・睡眠の合計がAMSスコアになります。</div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button type="button" class="btn" id="save" disabled>記録を保存</button>
+      <button type="button" class="btn ghost" id="reset">入力をクリア</button>
+      <span class="toast" id="toast" role="status"></span>
+    </div>
+    <ul class="notes">
+      <li>2500mを越える日から記録を始めます。</li>
+      <li>朝・夕とも食後に測定してください。</li>
+      <li>睡眠はトイレに起きた分は考慮しません。</li>
+    </ul>
+  </section>
+
+  <section class="card" aria-labelledby="hist-h">
+    <div class="item-head">
+      <h2 id="hist-h">記録の推移</h2>
+      <span class="small muted" id="count"></span>
+    </div>
+    <div id="example-banner" class="banner" hidden>下のグラフと一覧は<b>表示例</b>です。最初の記録を保存すると、あなたの記録に置き換わります。</div>
+    <div class="chart-box" id="chart"></div>
+    <div class="log" id="log"></div>
+    <div class="storage" id="storage">記録はこの端末のこのアプリ内に保存されます（通信不要）。機種変更やアプリ削除の前に「バックアップをコピー」で控えを取ってください。</div>
+  </section>
+
+  <section class="card" aria-labelledby="bk-h">
+    <h2 id="bk-h">バックアップ</h2>
+    <div class="actions">
+      <button type="button" class="btn ghost sm" id="copy-csv">表形式でコピー（CSV）</button>
+      <button type="button" class="btn ghost sm" id="copy-json">バックアップをコピー</button>
+      <button type="button" class="btn ghost sm" id="show-restore">バックアップから復元</button>
+      <span class="toast" id="bk-toast" role="status"></span>
+    </div>
+    <div id="restore-box" hidden style="display:flex;flex-direction:column;gap:8px">
+      <label class="f" for="restore-text">コピーしておいたバックアップを貼り付けてください
+        <textarea id="restore-text"></textarea>
+      </label>
+      <div class="actions"><button type="button" class="btn sm" id="do-restore">復元する</button><span class="err" id="restore-err"></span></div>
+    </div>
+  </section>
+
+  <footer>
+    <span>採点はWonders版AMS診断シート（高度順化チェックシート）に基づきます。5Pで停滞、7Pで下山検討。</span>
+    <span>このアプリは自己記録用で、医学的診断の代わりにはなりません。安静時の息苦しさ、まっすぐ歩けない、意識がぼんやりするなどの症状があれば、スコアに関わらずすぐに下山し、医療者に相談してください。</span>
+  </footer>
+</div>
+
+<script>
+(() => {
+  const ITEMS = [
+    { key: "headache", name: "頭痛", opts: [[0, "全くなし"], [1, "軽い"], [3, "中程度"], [7, "激しい頭痛"]] },
+    { key: "gi", name: "食欲・吐き気", opts: [[0, "全くなし"], [1, "食欲不振・少々吐気"], [3, "かなりの吐き気"], [7, "強い吐き気と嘔吐"]] },
+    { key: "dizzy", name: "めまい・ふらつき", opts: [[0, "まったくなし"], [1, "少し感じる"], [3, "かなり感じる"], [7, "耐えられない"]] },
+    { key: "sleep", name: "睡眠障害", note: "トイレに起きるのは考慮しない", opts: [[0, "快眠／普段通り"], [1, "普段より眠れなかった"], [3, "ほとんど眠れなかった"], [7, "まったく眠れなかった"]] },
+  ];
+  const LS_KEY = "ams-records-v1", LS_NAME = "ams-name-v1";
+  const EXAMPLES = [
+    { id: "ex1", date: "2026-04-02", time: "夕", place: "ルクラ", alt: 2840, spo2: 93, headache: 0, gi: 0, dizzy: 0, sleep: 0 },
+    { id: "ex2", date: "2026-04-03", time: "朝", place: "パクディン", alt: 2610, spo2: 92, headache: 1, gi: 0, dizzy: 0, sleep: 1 },
+    { id: "ex3", date: "2026-04-03", time: "夕", place: "ナムチェ・バザール", alt: 3440, spo2: 88, headache: 1, gi: 1, dizzy: 1, sleep: 0 },
+    { id: "ex4", date: "2026-04-04", time: "朝", place: "ナムチェ・バザール", alt: 3440, spo2: 86, headache: 3, gi: 1, dizzy: 0, sleep: 1 },
+    { id: "ex5", date: "2026-04-04", time: "夕", place: "ナムチェ・バザール", alt: 3440, spo2: 89, headache: 1, gi: 0, dizzy: 1, sleep: 0 },
+    { id: "ex6", date: "2026-04-05", time: "朝", place: "ナムチェ・バザール", alt: 3440, spo2: 90, headache: 1, gi: 0, dizzy: 0, sleep: 1 },
+  ];
+  const $ = (id) => document.getElementById(id);
+
+  // ---------- state ----------
+  let records = [];
+  let form = blankForm();
+  let editingId = null;
+  let confirmDeleteId = null;
+  let store = null; // { save(rec), remove(id), kind }
+
+  function today() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+  function blankForm() {
+    return { date: today(), time: new Date().getHours() < 14 ? "朝" : "夕", place: "", alt: "", spo2: "", headache: null, gi: null, dizzy: null, sleep: null };
+  }
+  const total = (r) => ITEMS.reduce((s, it) => s + (Number(r[it.key]) || 0), 0);
+  const complete = (r) => ITEMS.every((it) => r[it.key] !== null && r[it.key] !== undefined);
+  function level(score) {
+    if (score >= 7) return { cls: "bad", label: "下山を検討", advice: "7P以上です。これ以上登らず、下山を検討してください。症状が強い・悪化している場合はすぐに下ります。" };
+    if (score >= 5) return { cls: "warn", label: "停滞（高度を上げない）", advice: "5P以上です。今日は標高を上げず、同じ場所で順化してください。次の測定で再確認します。" };
+    return { cls: "ok", label: "順調", advice: "4P以下です。予定どおり行動できます。水分をとり、ゆっくり登りましょう。" };
+  }
+  const sortKey = (r) => `${r.date}-${r.time === "朝" ? 0 : 1}`;
+  const sorted = (list) => [...list].sort((a, b) => sortKey(a) < sortKey(b) ? -1 : sortKey(a) > sortKey(b) ? 1 : 0);
+  function fmtDate(iso) {
+    const [y, m, d] = iso.split("-").map(Number);
+    const wd = "日月火水木金土"[new Date(y, m - 1, d).getDay()];
+    return `${m}/${d}(${wd})`;
+  }
+
+  // ---------- local storage fallback ----------
+  function lsRead(k, fb) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fb; } catch { return fb; } }
+  function lsWrite(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+  const localStore = {
+    kind: "local",
+    async save(rec) { const i = records.findIndex((r) => r.id === rec.id); if (i >= 0) records[i] = rec; else records.push(rec); lsWrite(LS_KEY, records); },
+    async remove(id) { records = records.filter((r) => r.id !== id); lsWrite(LS_KEY, records); },
+  };
+
+  // ---------- form rendering ----------
+  function buildItems() {
+    const host = $("items");
+    host.innerHTML = "";
+    ITEMS.forEach((it) => {
+      const wrap = document.createElement("div");
+      wrap.className = "item";
+      wrap.innerHTML = `<div class="item-head"><b>${it.name}</b><span class="small muted">${it.note || ""}</span></div><div class="opts" role="group" aria-label="${it.name}"></div>`;
+      const opts = wrap.querySelector(".opts");
+      it.opts.forEach(([pt, lb]) => {
+        const b = document.createElement("button");
+        b.type = "button"; b.className = "opt"; b.id = `o-${it.key}-${pt}`;
+        b.dataset.key = it.key; b.dataset.pt = pt;
+        b.innerHTML = `<span class="pt">${pt}</span><span class="lb">${lb}</span>`;
+        b.addEventListener("click", () => { form[it.key] = form[it.key] === pt ? null : pt; renderForm(); });
+        opts.appendChild(b);
+      });
+      host.appendChild(wrap);
+    });
+  }
+  function renderForm() {
+    $("date").value = form.date || "";
+    $("alt").value = form.alt ?? "";
+    $("spo2").value = form.spo2 ?? "";
+    $("place").value = form.place || "";
+    document.querySelectorAll(".seg button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.time === form.time)));
+    document.querySelectorAll(".opt").forEach((b) => b.setAttribute("aria-pressed", String(form[b.dataset.key] === Number(b.dataset.pt))));
+    const res = $("result");
+    const answered = ITEMS.filter((it) => form[it.key] !== null).length;
+    if (!complete(form)) {
+      res.className = "result none";
+      $("score").textContent = answered ? total(form) : "–";
+      $("verdict").textContent = `あと${4 - answered}項目を選んでください`;
+      $("advice").textContent = "頭痛・食欲/吐き気・めまい・睡眠の合計がAMSスコアになります。";
+    } else {
+      const s = total(form), lv = level(s);
+      res.className = `result ${lv.cls}`;
+      $("score").textContent = s;
+      $("verdict").textContent = lv.label;
+      $("advice").textContent = lv.advice;
+    }
+    $("save").disabled = !(complete(form) && form.date && form.time);
+    $("save").textContent = editingId ? "変更を保存" : "記録を保存";
+    $("edit-flag").hidden = !editingId;
+  }
+  ["date", "alt", "spo2", "place"].forEach((k) => $(k).addEventListener("input", (e) => { form[k] = e.target.value; renderForm(); }));
+  document.querySelectorAll(".seg button").forEach((b) => b.addEventListener("click", () => { form.time = b.dataset.time; renderForm(); }));
+  $("reset").addEventListener("click", () => { form = blankForm(); editingId = null; renderForm(); });
+
+  let toastTimer;
+  function toast(el, msg) { const t = $(el); t.textContent = msg; clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.textContent = ""), 2600); }
+
+  $("save").addEventListener("click", async () => {
+    if (!complete(form)) return;
+    const rec = {
+      id: editingId || `r${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+      date: form.date, time: form.time, place: (form.place || "").trim(),
+      alt: form.alt === "" || form.alt == null ? null : Number(form.alt),
+      spo2: form.spo2 === "" || form.spo2 == null ? null : Number(form.spo2),
+      headache: form.headache, gi: form.gi, dizzy: form.dizzy, sleep: form.sleep,
+      updatedAt: Date.now(),
+    };
+    $("save").disabled = true;
+    try {
+      await store.save(rec);
+      if (store.kind !== "local") { const i = records.findIndex((r) => r.id === rec.id); if (i >= 0) records[i] = rec; else records.push(rec); }
+      const keep = { place: rec.place, alt: rec.alt ?? "" };
+      form = blankForm(); Object.assign(form, keep);
+      form.time = rec.time === "朝" ? "夕" : "朝";
+      if (rec.time === "夕") { const d = new Date(rec.date); d.setDate(d.getDate() + 1); form.date = d.toISOString().slice(0, 10); } else form.date = rec.date;
+      toast("toast", editingId ? "変更を保存しました" : `保存しました（${total(rec)}P）`);
+      editingId = null;
+      renderForm(); renderHistory();
+    } catch (e) {
+      alertErr("保存できませんでした。通信状態を確認して、もう一度保存してください。");
+      renderForm();
+    }
+  });
+  function alertErr(msg) { const t = $("toast"); t.style.color = "var(--bad)"; t.textContent = msg; setTimeout(() => { t.style.color = ""; }, 4000); }
+
+  // ---------- history ----------
+  function renderChart(list) {
+    const host = $("chart");
+    if (!list.length) { host.innerHTML = ""; return; }
+    const step = 44, padL = 30, padR = 12, padT = 12, padB = 40, h = 190;
+    const maxY = Math.max(12, ...list.map(total));
+    const w = Math.max(320, padL + padR + step * list.length);
+    const y = (v) => padT + (h - padT - padB) * (1 - v / maxY);
+    const css = getComputedStyle(document.documentElement);
+    const col = (n) => css.getPropertyValue(n).trim();
+    let svg = `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="AMSスコアの推移">`;
+    [0, 5, 7, maxY].filter((v, i, a) => a.indexOf(v) === i).forEach((v) => {
+      const c = v === 7 ? col("--bad") : v === 5 ? col("--warn") : col("--line");
+      svg += `<line x1="${padL}" x2="${w - padR}" y1="${y(v)}" y2="${y(v)}" stroke="${c}" stroke-width="1" ${v === 5 || v === 7 ? 'stroke-dasharray="4 3"' : ""}/>`;
+      svg += `<text x="${padL - 6}" y="${y(v) + 4}" text-anchor="end">${v}</text>`;
+    });
+    list.forEach((r, i) => {
+      const s = total(r), lv = level(s).cls;
+      const cx = padL + step * i + step / 2, bw = 22;
+      const top = y(Math.max(s, 0.15));
+      svg += `<rect x="${cx - bw / 2}" y="${top}" width="${bw}" height="${y(0) - top}" rx="3" fill="${col("--" + lv)}"><title>${r.date} ${r.time} ${s}P</title></rect>`;
+      svg += `<text x="${cx}" y="${top - 4}" text-anchor="middle" style="fill:var(--ink)">${s}</text>`;
+      const [, m, d] = r.date.split("-").map(Number);
+      const showDate = i === 0 || list[i - 1].date !== r.date;
+      svg += `<text x="${cx}" y="${h - padB + 15}" text-anchor="middle">${r.time}</text>`;
+      if (showDate) svg += `<text x="${cx}" y="${h - padB + 30}" text-anchor="middle">${m}/${d}</text>`;
+    });
+    svg += `</svg>`;
+    host.innerHTML = svg;
+  }
+
+  function renderHistory() {
+    const isExample = records.length === 0;
+    const list = sorted(isExample ? EXAMPLES : records);
+    $("example-banner").hidden = !isExample;
+    $("count").textContent = isExample ? "" : `${records.length}件`;
+    renderChart(list);
+    const log = $("log");
+    log.innerHTML = "";
+    [...list].reverse().forEach((r, idx, arr) => {
+      const s = total(r), lv = level(s);
+      const prev = arr[idx + 1];
+      let diff = "";
+      if (prev && r.alt != null && prev.alt != null && r.alt !== prev.alt) {
+        const dv = r.alt - prev.alt;
+        diff = `（前回比 ${dv > 0 ? "+" : "−"}${Math.abs(dv).toLocaleString()}m）`;
+      }
+      const el = document.createElement("div");
+      el.className = `rec ${lv.cls}`;
+      const parts = ITEMS.map((it) => `${it.name.slice(0, 2)}${r[it.key]}`).join("・");
+      el.innerHTML = `
+        <div class="sc">${s}<small>${lv.label.replace(/（.*）/, "")}</small></div>
+        <div class="meta">
+          <div class="top"></div>
+          <div class="sub"></div>
+          <div class="sub">${parts}</div>
+        </div>
+        <div class="btns"></div>`;
+      const top = el.querySelector(".top");
+      top.textContent = `${fmtDate(r.date)} ${r.time}　${r.place || "場所未記入"}`;
+      if (isExample) top.insertAdjacentHTML("beforeend", `<span class="example-tag">例</span>`);
+      el.querySelectorAll(".sub")[0].textContent =
+        `標高 ${r.alt != null ? r.alt.toLocaleString() + "m" : "–"}${diff}　SpO2 ${r.spo2 != null ? r.spo2 + "%" : "–"}`;
+      const btns = el.querySelector(".btns");
+      if (!isExample) {
+        if (confirmDeleteId === r.id) {
+          btns.innerHTML = `<button type="button" class="btn danger sm" data-act="del-yes">削除する</button><button type="button" class="btn ghost sm" data-act="del-no">やめる</button>`;
+        } else {
+          btns.innerHTML = `<button type="button" class="btn ghost sm" data-act="edit">編集</button><button type="button" class="btn ghost sm" data-act="del">削除</button>`;
+        }
+        btns.addEventListener("click", async (e) => {
+          const act = e.target.closest("button")?.dataset.act;
+          if (act === "edit") {
+            editingId = r.id;
+            form = { date: r.date, time: r.time, place: r.place || "", alt: r.alt ?? "", spo2: r.spo2 ?? "", headache: r.headache, gi: r.gi, dizzy: r.dizzy, sleep: r.sleep };
+            renderForm(); $("form-h").scrollIntoView({ behavior: "smooth", block: "start" });
+          } else if (act === "del") { confirmDeleteId = r.id; renderHistory(); }
+          else if (act === "del-no") { confirmDeleteId = null; renderHistory(); }
+          else if (act === "del-yes") {
+            try { await store.remove(r.id); records = records.filter((x) => x.id !== r.id); } catch { alertErr("削除できませんでした。もう一度お試しください。"); }
+            confirmDeleteId = null; if (editingId === r.id) { editingId = null; form = blankForm(); renderForm(); }
+            renderHistory();
+          }
+        });
+      }
+      log.appendChild(el);
+    });
+  }
+
+  // ---------- backup ----------
+  async function copy(text, okMsg) {
+    try { await navigator.clipboard.writeText(text); toast("bk-toast", okMsg); }
+    catch {
+      $("restore-box").hidden = false; $("restore-text").value = text; $("restore-text").select();
+      toast("bk-toast", "自動コピーできないため、下の欄の文字を選択してコピーしてください");
+    }
+  }
+  $("copy-csv").addEventListener("click", () => {
+    const head = ["日付", "測定", "場所", "標高(m)", "SpO2(%)", ...ITEMS.map((i) => i.name), "AMSスコア", "判定"];
+    const rows = sorted(records).map((r) => [r.date, r.time, r.place || "", r.alt ?? "", r.spo2 ?? "", ...ITEMS.map((i) => r[i.key]), total(r), level(total(r)).label]);
+    const name = $("name").value.trim();
+    const csv = (name ? `氏名,${name}\n` : "") + [head, ...rows].map((row) => row.map((c) => /[",\n]/.test(String(c)) ? `"${String(c).replace(/"/g, '""')}"` : c).join(",")).join("\n");
+    copy(csv, `${records.length}件をコピーしました`);
+  });
+  $("copy-json").addEventListener("click", () => copy(JSON.stringify({ app: "ams-check", v: 1, name: $("name").value.trim(), records: sorted(records) }), "バックアップをコピーしました"));
+  $("show-restore").addEventListener("click", () => { $("restore-box").hidden = !$("restore-box").hidden; });
+  $("do-restore").addEventListener("click", async () => {
+    $("restore-err").textContent = "";
+    let data;
+    try { data = JSON.parse($("restore-text").value); } catch { $("restore-err").textContent = "バックアップの形式が読み取れません。コピーした文字列を全部貼り付けてください。"; return; }
+    const list = Array.isArray(data) ? data : data.records;
+    if (!Array.isArray(list)) { $("restore-err").textContent = "記録が見つかりません。"; return; }
+    let n = 0;
+    for (const r of list) {
+      if (!r || !r.id || !r.date || !complete(r)) continue;
+      try { await store.save(r); if (store.kind !== "local") { const i = records.findIndex((x) => x.id === r.id); if (i >= 0) records[i] = r; else records.push(r); } n++; } catch {}
+    }
+    if (data.name && !$("name").value) { $("name").value = data.name; saveName(); }
+    $("restore-text").value = ""; $("restore-box").hidden = true;
+    toast("bk-toast", `${n}件を復元しました`);
+    renderHistory();
+  });
+
+  // ---------- name ----------
+  let saveName = () => lsWrite(LS_NAME, $("name").value.trim());
+  $("name").addEventListener("change", () => saveName());
+
+  // ---------- boot ----------
+  buildItems();
+  records = lsRead(LS_KEY, []);
+  $("name").value = lsRead(LS_NAME, "") || "";
+  store = localStore;
+  renderForm(); renderHistory();
+
+  // Offline app shell (installed to home screen)
+  if ("serviceWorker" in navigator && location.protocol === "https:") {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  }
+})();
+</script>
+</body>
+</html>
