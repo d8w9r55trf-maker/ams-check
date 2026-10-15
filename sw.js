@@ -1,4 +1,4 @@
-const CACHE = "ams-check-v1";
+const CACHE = "ams-check-1.0.1"; // バージョンを上げるたびに変える（端末のアプリが新しい版に入れ替わる）
 const FILES = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg", "./icon-180.png", "./icon-192.png", "./icon-512.png"];
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", (e) => {

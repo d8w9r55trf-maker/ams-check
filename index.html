@@ -232,6 +232,7 @@ footer { font-size: .78rem; color: var(--muted); display: flex; flex-direction: 
   </section>
 
   <footer>
+    <span>バージョン <span id="app-version" class="num">1.0.1</span></span>
     <span>採点はWonders版AMS診断シート（高度順化チェックシート）に基づきます。5Pで停滞、7Pで下山検討。</span>
     <span>このアプリは自己記録用で、医学的診断の代わりにはなりません。安静時の息苦しさ、まっすぐ歩けない、意識がぼんやりするなどの症状があれば、スコアに関わらずすぐに下山し、医療者に相談してください。</span>
   </footer>
@@ -245,6 +246,7 @@ footer { font-size: .78rem; color: var(--muted); display: flex; flex-direction: 
     { key: "dizzy", name: "めまい・ふらつき", opts: [[0, "まったくなし"], [1, "少し感じる"], [3, "かなり感じる"], [7, "耐えられない"]] },
     { key: "sleep", name: "睡眠障害", note: "トイレに起きるのは考慮しない", opts: [[0, "快眠／普段通り"], [1, "普段より眠れなかった"], [3, "ほとんど眠れなかった"], [7, "まったく眠れなかった"]] },
   ];
+  const APP_VERSION = "1.0.1"; // CHANGELOG.md と sw.js の CACHE も合わせて更新する
   const LS_KEY = "ams-records-v1", LS_NAME = "ams-name-v1";
   const EXAMPLES = [
     { id: "ex1", date: "2026-04-02", time: "夕", place: "ルクラ", alt: 2840, spo2: 93, headache: 0, gi: 0, dizzy: 0, sleep: 0 },
@@ -255,6 +257,7 @@ footer { font-size: .78rem; color: var(--muted); display: flex; flex-direction: 
     { id: "ex6", date: "2026-04-05", time: "朝", place: "ナムチェ・バザール", alt: 3440, spo2: 90, headache: 1, gi: 0, dizzy: 0, sleep: 1 },
   ];
   const $ = (id) => document.getElementById(id);
+  $("app-version").textContent = APP_VERSION;
 
   // ---------- state ----------
   let records = [];
